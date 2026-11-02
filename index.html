@@ -224,6 +224,7 @@ function blankForm(keep) {
   return {
     date: keep ? keep.date : state.init.today,
     channel: keep ? keep.channel : '',
+    refNo: '',
     note: '',
     items: [blankItem()],
   };
@@ -285,6 +286,10 @@ function render() {
   if (state.tab === 'form') renderForm(); else renderHistory();
 }
 
+function refLabel(ch) {
+  return ch === 'ออนไลน์' ? 'เลขออเดอร์ (ถ้ามี)' : 'เลขที่บิล/ใบเสร็จ <span class="req">*</span>';
+}
+
 function renderForm() {
   const f = state.form, init = state.init;
   $('#main').innerHTML = `
@@ -295,6 +300,8 @@ function renderForm() {
       <label>ช่องทาง <span class="req">*</span></label>
       <div class="seg">${init.channels.map(c =>
         `<button type="button" data-ch="${esc(c)}" class="${f.channel === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+      <label id="fRefLabel">${refLabel(f.channel)}</label>
+      <input id="fRef" value="${esc(f.refNo || '')}" placeholder="เช่น SO2611001" autocomplete="off" autocapitalize="characters" spellcheck="false">
     </div>
     <div id="items">${f.items.map(itemCard).join('')}</div>
     <button class="add-btn" id="addItem">+ เพิ่มรายการ</button>
@@ -312,10 +319,12 @@ function renderForm() {
   };
   $('#main').querySelectorAll('[data-ch]').forEach(b => b.onclick = () => {
     f.channel = b.dataset.ch;
+    $('#fRefLabel').innerHTML = refLabel(f.channel);
     $('#main').querySelectorAll('[data-ch]').forEach(x => x.classList.toggle('on', x === b));
     saveDraft();
   });
   $('#fNote').oninput = e => { f.note = e.target.value; saveDraft(); };
+  $('#fRef').oninput = e => { f.refNo = e.target.value; saveDraft(); };
   $('#addItem').onclick = () => {
     const last = f.items[f.items.length - 1];
     f.items.push(blankItem(last ? last.pay : ''));
@@ -444,8 +453,9 @@ function renderBar() {
 }
 
 /** ข้อความสรุปตามรูปแบบ: สรุปยอดขาย / วันที่ ... - ช่องทาง / 1) รหัส / จำนวน / ส่วนลด / วิธีชำระ */
-function summaryText(date, channel, lines, total, billId) {
-  const out = ['สรุปยอดขาย' + (billId ? ' (' + billId + ')' : ''), `วันที่ ${thDateNum(date)} - ${channel}`];
+function summaryText(date, channel, lines, total, refNo) {
+  const out = ['สรุปยอดขาย', `วันที่ ${thDateNum(date)} - ${channel}`];
+  if (refNo) out.push('เลขที่บิล ' + refNo);
   lines.forEach((l, i) => out.push(`${i + 1}) ${l.code} / ${l.qty} / ${l.discLabel || l.discInput || '0'} / ${l.pay}`));
   out.push(`รวมสุทธิ ${money(total)} บาท`);
   return out.join('\n');
@@ -456,6 +466,7 @@ function validate() {
   if (!f.date) return 'กรุณาเลือกวันที่ขาย';
   if (f.date > state.init.today) return 'วันที่ขายต้องไม่เกินวันนี้';
   if (!f.channel) return 'กรุณาเลือกช่องทาง หน้าร้าน หรือ ออนไลน์';
+  if (f.channel === 'หน้าร้าน' && !String(f.refNo || '').trim()) return 'กรุณากรอกเลขที่บิล/ใบเสร็จ';
   for (let i = 0; i < f.items.length; i++) {
     const it = f.items[i], c = calcItem(it), n = i + 1;
     if (c.state === 'empty') return `รายการที่ ${n}: กรุณากรอกรหัสสินค้า`;
@@ -478,7 +489,7 @@ function review() {
   openSheet(`
     <h3>ตรวจสอบก่อนส่ง</h3>
     <div class="meta">ยอดคำนวณจากราคาในระบบ</div>
-    <div class="summary">${esc(summaryText(f.date, f.channel, lines, total))}</div>
+    <div class="summary">${esc(summaryText(f.date, f.channel, lines, total, String(f.refNo || '').trim()))}</div>
     ${f.note.trim() ? `<div class="note">${esc(f.note.trim())}</div>` : ''}
     <button class="btn primary full" id="confirmBtn">ยืนยันส่งยอดขาย</button>
     <button class="btn ghost full" style="margin-top:8px" id="backBtn">กลับไปแก้ไข</button>`);
@@ -492,12 +503,12 @@ async function submit() {
   state.busy = true; btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
   try {
     const res = await api('submit', {
-      nonce: state.nonce, date: f.date, channel: f.channel, note: f.note.trim(),
+      nonce: state.nonce, date: f.date, channel: f.channel, note: f.note.trim(), refNo: String(f.refNo || '').trim(),
       items: f.items.map(it => ({ code: it.code.trim(), qty: Number(it.qty), discType: it.discType, disc: it.disc, pay: it.pay })),
     });
     state.busy = false;
     const b = res.bill;
-    const text = summaryText(b.date, b.channel, b.items, b.total, b.billId);
+    const text = summaryText(b.date, b.channel, b.items, b.total, b.refNo);
     state.form = blankForm(f);
     state.nonce = newNonce();
     state.history = null;
@@ -507,7 +518,7 @@ async function submit() {
     openSheet(`
       <div class="check">✓</div>
       <h3 style="text-align:center">บันทึกยอดขายแล้ว</h3>
-      <div class="meta" style="text-align:center">เลขที่บิล ${esc(b.billId)}</div>
+      <div class="meta" style="text-align:center">เลขที่ในระบบ ${esc(b.billId)}</div>
       <div class="summary">${esc(text)}</div>
       <button class="btn ghost full" id="copyBtn">คัดลอกข้อความสรุป</button>
       <button class="btn primary full" style="margin-top:8px" id="nextBtn">บันทึกบิลถัดไป</button>`);
@@ -556,7 +567,7 @@ function renderHistory() {
         <div><b>${esc(thDateNum(b.date))}</b> · ${esc(b.channel)}</div>
         ${b.status === 'ยกเลิก' ? '<span class="badge cancel">ยกเลิกแล้ว</span>' : `<span class="badge">${esc(b.billId)}</span>`}
       </div>
-      <div class="meta">บันทึกเมื่อ ${esc(b.recordedAt.slice(11))} น. ${esc(thDateNum(b.recordedAt.slice(0, 10)))}</div>
+      <div class="meta">${b.refNo ? 'บิล ' + esc(b.refNo) + ' · ' : ''}บันทึกเมื่อ ${esc(b.recordedAt.slice(11))} น. ${esc(thDateNum(b.recordedAt.slice(0, 10)))}</div>
       <ul class="bill-items">${b.items.map(it => `<li>
         <span>${it.line}) ${esc(it.code)} × ${it.qty}${it.discInput ? ' · ลด ' + esc(it.discInput) : ''} · ${esc(it.pay)}</span>
         <span>${money(it.net)}</span></li>`).join('')}</ul>
