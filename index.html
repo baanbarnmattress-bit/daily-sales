@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>บันทึกยอดขาย</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{
+    --bg:#f3f4f6; --card:#fff; --text:#1d2330; --muted:#6b7280; --line:#e5e7eb;
+    --primary:#06c755; --primary-dark:#04913f; --danger:#dc3c42; --blue:#2563eb;
+    --ok-bg:#e3f8ec; --bad-bg:#fdecec; --soft:#f1f3f5; --note-bg:#fffbea;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg)}
+  body{font-family:'IBM Plex Sans Thai',system-ui,-apple-system,sans-serif;color:var(--text);font-size:16px;-webkit-tap-highlight-color:transparent}
+  header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:14px 16px 0}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .hello{font-size:13px;color:var(--muted)}
+  .name{font-size:18px;font-weight:600}
+  .icon-btn{border:0;background:var(--soft);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;font-weight:500;color:var(--text)}
+  .tabs{display:flex;margin-top:10px}
+  .tab{flex:1;border:0;background:none;padding:10px 0 12px;font:inherit;font-weight:500;color:var(--muted);border-bottom:3px solid transparent}
+  .tab.active{color:var(--text);border-color:var(--primary)}
+  main{padding:12px 16px 120px;max-width:640px;margin:0 auto}
+  .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .meta{color:var(--muted);font-size:14px;margin:4px 0}
+  .btn{display:block;border:0;border-radius:10px;padding:12px 8px;font:inherit;font-weight:600;font-size:15px;text-align:center;text-decoration:none;cursor:pointer}
+  .btn.ghost{background:var(--soft);color:var(--text)}
+  .btn.primary{background:var(--primary);color:#fff}
+  .btn.danger{background:var(--bad-bg);color:var(--danger)}
+  .btn.full{width:100%;margin-top:18px;padding:14px}
+  .btn:disabled{opacity:.55}
+  .link-btn{border:0;background:none;color:var(--danger);font:inherit;font-size:14px;padding:4px 0}
+  .add-btn{width:100%;border:2px dashed #cfd4da;background:transparent;border-radius:14px;padding:14px;font:inherit;font-weight:600;color:var(--primary-dark);margin-bottom:12px}
+  .empty{text-align:center;color:var(--muted);padding:56px 16px}
+  .center{min-height:80vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;max-width:420px;margin:0 auto}
+  .center h2{margin:8px 0}
+  .center p{color:var(--muted);line-height:1.6}
+  input,textarea,select{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);-webkit-appearance:none;appearance:none}
+  select{background-image:linear-gradient(45deg,transparent 50%,#6b7280 50%),linear-gradient(135deg,#6b7280 50%,transparent 50%);background-position:calc(100% - 18px) 52%,calc(100% - 13px) 52%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+  input.bad{border-color:var(--danger);background:var(--bad-bg)}
+  textarea{min-height:70px;resize:vertical}
+  label{display:block;font-weight:500;margin:14px 0 6px;font-size:15px}
+  .card > label:first-of-type{margin-top:4px}
+  .req{color:var(--danger)}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .seg button{border:2px solid var(--line);background:#fff;border-radius:10px;padding:12px;font:inherit;font-weight:600;color:var(--text)}
+  .seg button.on{border-color:var(--primary);background:var(--ok-bg);color:var(--primary-dark)}
+  .date-th{font-size:13px;color:var(--muted);margin-top:4px}
+  .item-head{display:flex;justify-content:space-between;align-items:center}
+  .item-no{font-weight:600}
+  .pinfo{font-size:14px;margin-top:6px;min-height:20px}
+  .pinfo.ok{color:var(--primary-dark)}
+  .pinfo.err{color:var(--danger)}
+  .grid2{display:grid;grid-template-columns:1fr 1.3fr;gap:10px}
+  .stepper{display:grid;grid-template-columns:44px 1fr 44px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .stepper button{border:0;background:var(--soft);font:inherit;font-size:20px;font-weight:600;color:var(--text)}
+  .stepper input{border:0;border-radius:0;text-align:center;padding:12px 4px}
+  .disc{display:grid;grid-template-columns:1fr 112px;gap:8px}
+  .unit{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .unit button{border:0;background:#fff;font:inherit;font-weight:600;color:var(--muted)}
+  .unit button.on{background:var(--ok-bg);color:var(--primary-dark)}
+  .line-total{display:flex;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-size:14px;color:var(--muted)}
+  .line-total b{color:var(--text);font-size:16px}
+  .bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+  .bar-in{max-width:640px;margin:0 auto;display:flex;align-items:center;gap:12px}
+  .bar-sum{flex:1}
+  .bar-sum .meta{margin:0;font-size:13px}
+  .bar-sum b{font-size:20px}
+  .bar .btn{padding:13px 20px}
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10;display:none;align-items:flex-end;justify-content:center}
+  .sheet-bg.open{display:flex}
+  .sheet{background:var(--card);width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom))}
+  .sheet h3{margin:0 0 4px;font-size:18px}
+  .summary{background:var(--soft);border-radius:12px;padding:12px 14px;white-space:pre-wrap;line-height:1.7;font-size:15px;margin-top:12px;word-break:break-word}
+  .toast{position:fixed;left:16px;right:16px;bottom:96px;background:#1d2330;color:#fff;padding:14px;border-radius:12px;text-align:center;z-index:30;display:none;max-width:600px;margin:0 auto}
+  .spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:14px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .badge{font-size:12px;padding:3px 9px;border-radius:999px;background:#eef2ff;color:var(--blue);font-weight:500;white-space:nowrap}
+  .badge.cancel{background:var(--bad-bg);color:var(--danger)}
+  .bill.cancelled{opacity:.6}
+  .bill-items{margin:8px 0 0;padding:0;list-style:none;font-size:14px}
+  .bill-items li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+  .bill-items li span:first-child{color:var(--muted)}
+  .bill-total{display:flex;justify-content:space-between;margin-top:8px;font-weight:600}
+  .note{background:var(--note-bg);border-radius:8px;padding:8px 10px;font-size:14px;margin-top:8px}
+  .check{width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--primary-dark);font-size:30px;display:flex;align-items:center;justify-content:center;margin:4px auto 8px}
+</style>
+</head>
+<body>
+<div id="app"><div class="center"><div class="spinner"></div><p>กำลังโหลด...</p></div></div>
+<datalist id="productList"></datalist>
+
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== ตั้งค่า (แก้ 2 บรรทัดนี้) ================== */
+const LIFF_ID = '2012335287-2TbmobiZ';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzYusoglnmViYONaee2lSrvoARwCzAC1P2iX9_3t4ulfvIuTXD0aSO_XsckcjtrYN58/exec';
+/* ============================================================ */
+
+const DRAFT_KEY = 'daily-sales-draft-v1';
+const state = {
+  idToken: null, init: null, products: {}, tab: 'form', history: null,
+  form: null, nonce: null, busy: false,
+};
+const $ = s => document.querySelector(s);
+const app = $('#app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const normCode = c => String(c ?? '').trim().toUpperCase();
+const newNonce = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+const TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+/** 2026-11-02 → 02/11/2569 */
+function thDateNum(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? `${m[3]}/${m[2]}/${Number(m[1]) + 543}` : (iso || '');
+}
+/** 2026-11-02 → 2 พ.ย. 2569 */
+function thDateLong(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? `${Number(m[3])} ${TH_MONTHS[Number(m[2]) - 1]} ${Number(m[1]) + 543}` : (iso || '');
+}
+
+function toast(msg, ms = 2800) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => (t.style.display = 'none'), ms);
+}
+function showLoading(msg = 'กำลังโหลด...') {
+  app.innerHTML = `<div class="center"><div class="spinner"></div><p>${esc(msg)}</p></div>`;
+}
+function showMessage(title, msg, retry = true) {
+  app.innerHTML = `<div class="center"><h2>${esc(title)}</h2><p>${esc(msg)}</p>
+    ${retry ? '<button class="btn primary full" onclick="location.reload()">ลองใหม่</button>' : ''}</div>`;
+}
+
+async function api(action, data = {}) {
+  // ไม่ใส่ Content-Type เพื่อให้เป็น simple request (เลี่ยงปัญหา CORS กับ Apps Script)
+  const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, idToken: state.idToken, ...data }) });
+  const json = await res.json();
+  if (!json.ok) {
+    if (json.error === 'TOKEN_EXPIRED') {
+      if (!liff.isInClient()) { liff.logout(); location.reload(); }
+      throw new Error('เซสชันหมดอายุ กรุณาปิดหน้านี้แล้วเปิดใหม่จาก LINE');
+    }
+    if (json.error === 'NOT_REGISTERED') { showRegister(); throw Object.assign(new Error(''), { silent: true }); }
+    throw new Error(json.error || 'เกิดข้อผิดพลาด');
+  }
+  return json;
+}
+
+/* ---------------- เริ่มต้น ---------------- */
+async function main() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+    state.idToken = liff.getIDToken();
+    if (!state.idToken) throw new Error('ไม่ได้รับ ID token: ตรวจว่าเปิด scope "openid" ใน LIFF แล้ว');
+    const me = await api('me');
+    if (!me.staff) return showRegister(me.lineName);
+    if (!me.staff.active) return showMessage('บัญชีถูกระงับ', 'กรุณาติดต่อแอดมิน', false);
+    await loadInit();
+  } catch (e) {
+    if (!e.silent) showMessage('เกิดข้อผิดพลาด', e.message);
+  }
+}
+
+async function loadInit() {
+  showLoading('กำลังโหลดรายการสินค้า...');
+  try {
+    state.init = await api('init');
+    state.products = {};
+    state.init.products.forEach(p => { state.products[normCode(p.code)] = p; });
+    $('#productList').innerHTML = state.init.products
+      .map(p => `<option value="${esc(p.code)}">${esc(p.name)} · ${money(p.price)} ฿</option>`).join('');
+    state.form = loadDraft() || blankForm();
+    state.nonce = newNonce();
+    render();
+  } catch (e) {
+    if (!e.silent) showMessage('โหลดข้อมูลไม่สำเร็จ', e.message);
+  }
+}
+
+/* ---------------- ลงทะเบียน ---------------- */
+function showRegister(lineName = '') {
+  app.innerHTML = `<div class="center">
+    <h2>ลงทะเบียนพนักงาน</h2>
+    <p>${lineName ? 'สวัสดี ' + esc(lineName) + '<br>' : ''}กรอกเบอร์โทรที่แจ้งไว้กับแอดมิน<br>ทำครั้งเดียว ครั้งต่อไปเข้าได้ทันที</p>
+    <input id="regPhone" type="tel" inputmode="numeric" placeholder="เช่น 0812345678" autocomplete="tel">
+    <button class="btn primary full" id="regBtn">ลงทะเบียน</button>
+  </div>`;
+  $('#regBtn').onclick = async () => {
+    const phone = $('#regPhone').value.trim();
+    if (phone.replace(/\D/g, '').length < 9) return toast('กรุณากรอกเบอร์โทรให้ถูกต้อง');
+    const btn = $('#regBtn');
+    btn.disabled = true; btn.textContent = 'กำลังตรวจสอบ...';
+    try {
+      const me = await api('register', { phone });
+      toast('ลงทะเบียนสำเร็จ ยินดีต้อนรับ ' + me.staff.name);
+      await loadInit();
+    } catch (e) {
+      if (!e.silent) toast(e.message, 4000);
+      btn.disabled = false; btn.textContent = 'ลงทะเบียน';
+    }
+  };
+}
+
+/* ---------------- ฟอร์ม ---------------- */
+function blankItem(pay = '') {
+  return { code: '', qty: 1, discType: 'baht', disc: '', pay };
+}
+function blankForm(keep) {
+  return {
+    date: keep ? keep.date : state.init.today,
+    channel: keep ? keep.channel : '',
+    note: '',
+    items: [blankItem()],
+  };
+}
+function saveDraft() {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedOn: state.init.today, form: state.form })); } catch (e) { /* ignore */ }
+}
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
+}
+function loadDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    if (!d || d.savedOn !== state.init.today || !d.form || !Array.isArray(d.form.items) || !d.form.items.length) return null;
+    return d.form;
+  } catch (e) { return null; }
+}
+
+/** คำนวณยอด 1 รายการ (สูตรเดียวกับฝั่ง server) */
+function calcItem(it) {
+  const p = state.products[normCode(it.code)];
+  if (!it.code.trim()) return { state: 'empty' };
+  if (!p) return { state: 'unknown' };
+  const qty = Number(it.qty);
+  const gross = round2(p.price * (Number.isInteger(qty) && qty > 0 ? qty : 0));
+  const raw = String(it.disc ?? '').replace(/,/g, '').trim();
+  const d = raw === '' ? 0 : Number(raw);
+  let error = '';
+  if (!Number.isInteger(qty) || qty <= 0) error = 'จำนวนต้องมากกว่า 0';
+  else if (!isFinite(d) || d < 0) error = 'ส่วนลดไม่ถูกต้อง';
+  else if (it.discType === 'pct' && d > 100) error = 'ส่วนลดเกิน 100%';
+  const disc = error ? 0 : round2(it.discType === 'pct' ? gross * d / 100 : d);
+  if (!error && disc > gross) error = 'ส่วนลดมากกว่าราคาสินค้า';
+  return { state: 'ok', p, qty, gross, disc, net: error ? 0 : round2(gross - disc), error,
+    discLabel: d ? (it.discType === 'pct' ? d + '%' : money(d) + ' บาท') : '0' };
+}
+
+function render() {
+  const s = state.init.staff;
+  app.innerHTML = `
+    <header>
+      <div class="top">
+        <div><div class="hello">บันทึกยอดขาย</div><div class="name">${esc(s.name)}</div></div>
+        <button class="icon-btn" id="reloadBtn">รีเฟรช</button>
+      </div>
+      <div class="tabs">
+        <button class="tab ${state.tab === 'form' ? 'active' : ''}" data-tab="form">บันทึกยอด</button>
+        <button class="tab ${state.tab === 'history' ? 'active' : ''}" data-tab="history">ย้อนหลัง 7 วัน</button>
+      </div>
+    </header>
+    <main id="main"></main>
+    <div class="bar" id="bar" style="${state.tab === 'form' ? '' : 'display:none'}"></div>`;
+  $('#reloadBtn').onclick = () => state.tab === 'form' ? loadInit() : loadHistory();
+  app.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+    state.tab = b.dataset.tab;
+    render();
+    if (state.tab === 'history') loadHistory();
+  });
+  if (state.tab === 'form') renderForm(); else renderHistory();
+}
+
+function renderForm() {
+  const f = state.form, init = state.init;
+  $('#main').innerHTML = `
+    <div class="card">
+      <label>วันที่ขาย <span class="req">*</span></label>
+      <input type="date" id="fDate" value="${esc(f.date)}" max="${esc(init.today)}">
+      <div class="date-th" id="fDateTh">${esc(thDateLong(f.date))}</div>
+      <label>ช่องทาง <span class="req">*</span></label>
+      <div class="seg">${init.channels.map(c =>
+        `<button type="button" data-ch="${esc(c)}" class="${f.channel === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+    </div>
+    <div id="items">${f.items.map(itemCard).join('')}</div>
+    <button class="add-btn" id="addItem">+ เพิ่มรายการ</button>
+    <div class="card">
+      <label>หมายเหตุ (ถ้ามี)</label>
+      <textarea id="fNote" placeholder="เช่น ชื่อลูกค้า / เลขที่ออเดอร์ออนไลน์">${esc(f.note)}</textarea>
+    </div>`;
+  f.items.forEach((_, i) => updateItemInfo(i));
+  renderBar();
+
+  $('#fDate').onchange = e => {
+    f.date = e.target.value;
+    $('#fDateTh').textContent = thDateLong(f.date);
+    saveDraft();
+  };
+  $('#main').querySelectorAll('[data-ch]').forEach(b => b.onclick = () => {
+    f.channel = b.dataset.ch;
+    $('#main').querySelectorAll('[data-ch]').forEach(x => x.classList.toggle('on', x === b));
+    saveDraft();
+  });
+  $('#fNote').oninput = e => { f.note = e.target.value; saveDraft(); };
+  $('#addItem').onclick = () => {
+    const last = f.items[f.items.length - 1];
+    f.items.push(blankItem(last ? last.pay : ''));
+    saveDraft();
+    renderForm();
+    const cards = $('#items').querySelectorAll('.item');
+    const card = cards[cards.length - 1];
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => card.querySelector('[data-f="code"]').focus(), 300);
+  };
+
+  const items = $('#items');
+  items.addEventListener('input', e => {
+    const el = e.target, card = el.closest('.item');
+    if (!card || !el.dataset.f) return;
+    const i = Number(card.dataset.i);
+    f.items[i][el.dataset.f] = el.dataset.f === 'qty' ? Number(el.value) : el.value;
+    updateItemInfo(i);
+    renderBar();
+    saveDraft();
+  });
+  items.addEventListener('change', e => {
+    const el = e.target;
+    if (el.dataset.f === 'code') {
+      const i = Number(el.closest('.item').dataset.i);
+      const p = state.products[normCode(el.value)];
+      if (p) { el.value = p.code; f.items[i].code = p.code; saveDraft(); }
+    }
+  });
+  items.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const card = b.closest('.item');
+    const i = Number(card.dataset.i);
+    const it = f.items[i];
+    if (b.dataset.step) {
+      const q = Math.max(1, (Number.isInteger(Number(it.qty)) ? Number(it.qty) : 1) + Number(b.dataset.step));
+      it.qty = q;
+      card.querySelector('[data-f="qty"]').value = q;
+    } else if (b.dataset.unit) {
+      it.discType = b.dataset.unit;
+      card.querySelectorAll('[data-unit]').forEach(x => x.classList.toggle('on', x === b));
+    } else if (b.dataset.remove !== undefined) {
+      f.items.splice(i, 1);
+      saveDraft();
+      return renderForm();
+    } else return;
+    updateItemInfo(i);
+    renderBar();
+    saveDraft();
+  });
+}
+
+function itemCard(it, i) {
+  const pays = state.init.payments;
+  return `<div class="card item" data-i="${i}">
+    <div class="item-head">
+      <span class="item-no">รายการที่ ${i + 1}</span>
+      ${state.form.items.length > 1 ? '<button type="button" class="link-btn" data-remove>ลบ</button>' : ''}
+    </div>
+    <label>รหัสสินค้า <span class="req">*</span></label>
+    <input data-f="code" list="productList" value="${esc(it.code)}" placeholder="พิมพ์รหัสหรือเลือกจากรายการ"
+      autocomplete="off" autocapitalize="characters" spellcheck="false">
+    <div class="pinfo" data-info></div>
+    <div class="grid2">
+      <div>
+        <label>จำนวน <span class="req">*</span></label>
+        <div class="stepper">
+          <button type="button" data-step="-1" aria-label="ลด">−</button>
+          <input data-f="qty" type="number" inputmode="numeric" min="1" step="1" value="${esc(it.qty)}">
+          <button type="button" data-step="1" aria-label="เพิ่ม">+</button>
+        </div>
+      </div>
+      <div>
+        <label>วิธีชำระ <span class="req">*</span></label>
+        <select data-f="pay">
+          <option value="" ${it.pay ? '' : 'selected'} disabled>เลือก</option>
+          ${pays.map(p => `<option ${p === it.pay ? 'selected' : ''}>${esc(p)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <label>ส่วนลด</label>
+    <div class="disc">
+      <input data-f="disc" type="text" inputmode="decimal" value="${esc(it.disc)}" placeholder="0">
+      <div class="unit">
+        <button type="button" data-unit="baht" class="${it.discType !== 'pct' ? 'on' : ''}">บาท</button>
+        <button type="button" data-unit="pct" class="${it.discType === 'pct' ? 'on' : ''}">%</button>
+      </div>
+    </div>
+    <div class="line-total" data-total></div>
+  </div>`;
+}
+
+function updateItemInfo(i) {
+  const card = $('#items').querySelector(`.item[data-i="${i}"]`);
+  if (!card) return;
+  const c = calcItem(state.form.items[i]);
+  const info = card.querySelector('[data-info]');
+  const total = card.querySelector('[data-total]');
+  card.querySelector('[data-f="code"]').classList.toggle('bad', c.state === 'unknown');
+  if (c.state === 'empty') { info.className = 'pinfo'; info.textContent = ''; total.innerHTML = ''; return; }
+  if (c.state === 'unknown') {
+    info.className = 'pinfo err'; info.textContent = 'ไม่พบรหัสสินค้านี้';
+    total.innerHTML = ''; return;
+  }
+  info.className = 'pinfo ok';
+  info.textContent = `${c.p.name} · ${money(c.p.price)} บาท/ชิ้น`;
+  total.innerHTML = c.error
+    ? `<span style="color:var(--danger)">${esc(c.error)}</span><span></span>`
+    : `<span>${money(c.gross)}${c.disc ? ' − ส่วนลด ' + money(c.disc) : ''}</span><b>${money(c.net)} ฿</b>`;
+}
+
+function formTotal() {
+  return state.form.items.reduce((a, it) => {
+    const c = calcItem(it);
+    return c.state === 'ok' && !c.error ? round2(a + c.net) : a;
+  }, 0);
+}
+
+function renderBar() {
+  const n = state.form.items.length;
+  $('#bar').innerHTML = `<div class="bar-in">
+    <div class="bar-sum"><p class="meta">${n} รายการ · ยอดสุทธิ</p><b>${money(formTotal())} ฿</b></div>
+    <button class="btn primary" id="reviewBtn">ตรวจสอบและส่ง</button></div>`;
+  $('#reviewBtn').onclick = review;
+}
+
+/** ข้อความสรุปตามรูปแบบ: สรุปยอดขาย / วันที่ ... - ช่องทาง / 1) รหัส / จำนวน / ส่วนลด / วิธีชำระ */
+function summaryText(date, channel, lines, total, billId) {
+  const out = ['สรุปยอดขาย' + (billId ? ' (' + billId + ')' : ''), `วันที่ ${thDateNum(date)} - ${channel}`];
+  lines.forEach((l, i) => out.push(`${i + 1}) ${l.code} / ${l.qty} / ${l.discLabel || l.discInput || '0'} / ${l.pay}`));
+  out.push(`รวมสุทธิ ${money(total)} บาท`);
+  return out.join('\n');
+}
+
+function validate() {
+  const f = state.form;
+  if (!f.date) return 'กรุณาเลือกวันที่ขาย';
+  if (f.date > state.init.today) return 'วันที่ขายต้องไม่เกินวันนี้';
+  if (!f.channel) return 'กรุณาเลือกช่องทาง หน้าร้าน หรือ ออนไลน์';
+  for (let i = 0; i < f.items.length; i++) {
+    const it = f.items[i], c = calcItem(it), n = i + 1;
+    if (c.state === 'empty') return `รายการที่ ${n}: กรุณากรอกรหัสสินค้า`;
+    if (c.state === 'unknown') return `รายการที่ ${n}: ไม่พบรหัสสินค้า "${it.code}"`;
+    if (c.error) return `รายการที่ ${n}: ${c.error}`;
+    if (!it.pay) return `รายการที่ ${n}: กรุณาเลือกวิธีชำระ`;
+  }
+  return '';
+}
+
+function review() {
+  const err = validate();
+  if (err) return toast(err, 3500);
+  const f = state.form;
+  const lines = f.items.map(it => {
+    const c = calcItem(it);
+    return { code: c.p.code, qty: c.qty, discLabel: c.discLabel, pay: it.pay };
+  });
+  const total = formTotal();
+  openSheet(`
+    <h3>ตรวจสอบก่อนส่ง</h3>
+    <div class="meta">ยอดคำนวณจากราคาในระบบ</div>
+    <div class="summary">${esc(summaryText(f.date, f.channel, lines, total))}</div>
+    ${f.note.trim() ? `<div class="note">${esc(f.note.trim())}</div>` : ''}
+    <button class="btn primary full" id="confirmBtn">ยืนยันส่งยอดขาย</button>
+    <button class="btn ghost full" style="margin-top:8px" id="backBtn">กลับไปแก้ไข</button>`);
+  $('#backBtn').onclick = closeSheet;
+  $('#confirmBtn').onclick = submit;
+}
+
+async function submit() {
+  const f = state.form;
+  const btn = $('#confirmBtn');
+  state.busy = true; btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+  try {
+    const res = await api('submit', {
+      nonce: state.nonce, date: f.date, channel: f.channel, note: f.note.trim(),
+      items: f.items.map(it => ({ code: it.code.trim(), qty: Number(it.qty), discType: it.discType, disc: it.disc, pay: it.pay })),
+    });
+    state.busy = false;
+    const b = res.bill;
+    const text = summaryText(b.date, b.channel, b.items, b.total, b.billId);
+    state.form = blankForm(f);
+    state.nonce = newNonce();
+    state.history = null;
+    clearDraft();
+    renderForm();
+    window.scrollTo(0, 0);
+    openSheet(`
+      <div class="check">✓</div>
+      <h3 style="text-align:center">บันทึกยอดขายแล้ว</h3>
+      <div class="meta" style="text-align:center">เลขที่บิล ${esc(b.billId)}</div>
+      <div class="summary">${esc(text)}</div>
+      <button class="btn ghost full" id="copyBtn">คัดลอกข้อความสรุป</button>
+      <button class="btn primary full" style="margin-top:8px" id="nextBtn">บันทึกบิลถัดไป</button>`);
+    $('#nextBtn').onclick = closeSheet;
+    $('#copyBtn').onclick = () => copyText(text);
+  } catch (e) {
+    state.busy = false;
+    if (!e.silent) toast(e.message, 4500);
+    btn.disabled = false; btn.textContent = 'ยืนยันส่งยอดขาย';
+  }
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast('คัดลอกแล้ว', 1500); }
+  catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('คัดลอกแล้ว', 1500); } catch (e2) { toast('คัดลอกไม่ได้'); }
+    ta.remove();
+  }
+}
+
+/* ---------------- ย้อนหลัง ---------------- */
+async function loadHistory() {
+  if (!state.history) $('#main').innerHTML = '<div class="center" style="min-height:50vh"><div class="spinner"></div><p>กำลังโหลด...</p></div>';
+  try {
+    state.history = await api('history');
+    if (state.tab === 'history') renderHistory();
+  } catch (e) {
+    if (!e.silent) toast(e.message, 4000);
+  }
+}
+
+function renderHistory() {
+  const main = $('#main');
+  if (!state.history) return;
+  const bills = state.history.bills;
+  if (!bills.length) { main.innerHTML = '<div class="empty">ยังไม่มีบิลใน 7 วันที่ผ่านมา</div>'; return; }
+  const ok = bills.filter(b => b.status !== 'ยกเลิก');
+  const todayTotal = ok.filter(b => b.date === state.history.today).reduce((a, b) => a + b.total, 0);
+  main.innerHTML = `
+    <div class="card"><div class="row"><span class="meta" style="margin:0">ยอดขายวันนี้ที่คุณบันทึก</span><b>${money(todayTotal)} ฿</b></div></div>
+    ${bills.map(b => `
+    <div class="card bill ${b.status === 'ยกเลิก' ? 'cancelled' : ''}">
+      <div class="row">
+        <div><b>${esc(thDateNum(b.date))}</b> · ${esc(b.channel)}</div>
+        ${b.status === 'ยกเลิก' ? '<span class="badge cancel">ยกเลิกแล้ว</span>' : `<span class="badge">${esc(b.billId)}</span>`}
+      </div>
+      <div class="meta">บันทึกเมื่อ ${esc(b.recordedAt.slice(11))} น. ${esc(thDateNum(b.recordedAt.slice(0, 10)))}</div>
+      <ul class="bill-items">${b.items.map(it => `<li>
+        <span>${it.line}) ${esc(it.code)} × ${it.qty}${it.discInput ? ' · ลด ' + esc(it.discInput) : ''} · ${esc(it.pay)}</span>
+        <span>${money(it.net)}</span></li>`).join('')}</ul>
+      <div class="bill-total"><span>รวมสุทธิ</span><span>${money(b.total)} ฿</span></div>
+      ${b.note ? `<div class="note">${esc(b.note)}</div>` : ''}
+      ${b.status !== 'ยกเลิก' ? `<button class="btn danger full" style="margin-top:12px;padding:10px" data-cancel="${esc(b.billId)}">ยกเลิกบิลนี้</button>` : ''}
+    </div>`).join('')}`;
+  main.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => openCancel(b.dataset.cancel));
+}
+
+function openCancel(billId) {
+  openSheet(`
+    <h3>ยกเลิกบิล ${esc(billId)}</h3>
+    <div class="meta">ยอดของบิลนี้จะไม่ถูกนับในสรุป (ข้อมูลยังอยู่ในชีต)</div>
+    <label>เหตุผลที่ยกเลิก <span class="req">*</span></label>
+    <textarea id="cancelReason" placeholder="เช่น คีย์ผิด จะบันทึกใหม่ / ลูกค้าคืนสินค้า"></textarea>
+    <button class="btn danger full" id="doCancel">ยืนยันยกเลิกบิล</button>
+    <button class="btn ghost full" style="margin-top:8px" id="backBtn">ไม่ยกเลิก</button>`);
+  $('#backBtn').onclick = closeSheet;
+  $('#doCancel').onclick = async () => {
+    const reason = $('#cancelReason').value.trim();
+    if (!reason) return toast('กรุณาระบุเหตุผล');
+    const btn = $('#doCancel');
+    state.busy = true; btn.disabled = true; btn.textContent = 'กำลังยกเลิก...';
+    try {
+      await api('cancel', { billId, reason });
+      state.busy = false;
+      closeSheet();
+      toast('ยกเลิกบิลแล้ว');
+      await loadHistory();
+    } catch (e) {
+      state.busy = false;
+      if (!e.silent) toast(e.message, 4000);
+      btn.disabled = false; btn.textContent = 'ยืนยันยกเลิกบิล';
+    }
+  };
+}
+
+/* ---------------- sheet ---------------- */
+function openSheet(html) {
+  $('#sheet').innerHTML = html;
+  $('#sheetBg').classList.add('open');
+}
+function closeSheet() {
+  if (state.busy) return;
+  $('#sheetBg').classList.remove('open');
+}
+$('#sheetBg').addEventListener('click', e => { if (e.target.id === 'sheetBg') closeSheet(); });
+
+main();
+</script>
+</body>
+</html>
