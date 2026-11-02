@@ -90,6 +90,12 @@
   .bill-total{display:flex;justify-content:space-between;margin-top:8px;font-weight:600}
   .note{background:var(--note-bg);border-radius:8px;padding:8px 10px;font-size:14px;margin-top:8px}
   .check{width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--primary-dark);font-size:30px;display:flex;align-items:center;justify-content:center;margin:4px auto 8px}
+  .prod{border-top:1px dashed var(--line);margin-top:14px;padding-top:12px}
+  .prod-head{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--muted);margin-bottom:6px}
+  .prod .disc{grid-template-columns:1fr 64px}
+  .add-prod{width:100%;margin-top:12px;border:1px dashed #cfd4da;background:var(--soft);border-radius:10px;padding:10px;font:inherit;font-weight:600;color:var(--primary-dark)}
+  .bill-sum{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:2px solid var(--line);font-weight:600}
+  .bill-sum b{font-size:17px}
 </style>
 </head>
 <body>
@@ -105,7 +111,7 @@ const LIFF_ID = '2012335287-2TbmobiZ';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzYusoglnmViYONaee2lSrvoARwCzAC1P2iX9_3t4ulfvIuTXD0aSO_XsckcjtrYN58/exec';
 /* ============================================================ */
 
-const DRAFT_KEY = 'daily-sales-draft-v1';
+const DRAFT_KEY = 'daily-sales-draft-v2';
 const state = {
   idToken: null, init: null, products: {}, tab: 'form', history: null,
   form: null, nonce: null, busy: false,
@@ -217,15 +223,19 @@ function showRegister(lineName = '') {
 }
 
 /* ---------------- ฟอร์ม ---------------- */
-function blankItem(pay = '', ref = '') {
-  return { ref, code: '', qty: 1, discType: 'baht', disc: '', pay };
+// โครงสร้าง: form.bills = [{ ref, pay, items: [{ code, qty, discType, disc }] }]
+function blankItem() {
+  return { code: '', qty: 1, discType: 'baht', disc: '' };
+}
+function blankBill(pay = '') {
+  return { ref: '', pay, items: [blankItem()] };
 }
 function blankForm(keep) {
   return {
     date: keep ? keep.date : state.init.today,
     channel: keep ? keep.channel : '',
     note: '',
-    items: [blankItem()],
+    bills: [blankBill()],
   };
 }
 function saveDraft() {
@@ -237,7 +247,7 @@ function clearDraft() {
 function loadDraft() {
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
-    if (!d || d.savedOn !== state.init.today || !d.form || !Array.isArray(d.form.items) || !d.form.items.length) return null;
+    if (!d || d.savedOn !== state.init.today || !d.form || !Array.isArray(d.form.bills) || !d.form.bills.length) return null;
     return d.form;
   } catch (e) { return null; }
 }
@@ -259,6 +269,13 @@ function calcItem(it) {
   if (!error && disc > gross) error = 'ส่วนลดมากกว่าราคาสินค้า';
   return { state: 'ok', p, qty, gross, disc, net: error ? 0 : round2(gross - disc), error,
     discLabel: d ? (it.discType === 'pct' ? d + '%' : money(d) + ' บาท') : '0' };
+}
+
+/** รายการทั้งหมดแบบแบน (ส่งให้ server ทีละรายการ พร้อมเลขที่บิลและวิธีชำระของบิลนั้น) */
+function flatItems() {
+  const out = [];
+  state.form.bills.forEach(b => b.items.forEach(it => out.push({ ...it, ref: String(b.ref || '').trim(), pay: b.pay })));
+  return out;
 }
 
 function render() {
@@ -289,7 +306,7 @@ function refLabel(ch) {
   return ch === 'ออนไลน์' ? 'เลขออเดอร์ (ถ้ามี)' : 'เลขที่บิล/ใบเสร็จ <span class="req">*</span>';
 }
 
-function renderForm() {
+function renderForm(focus) {
   const f = state.form, init = state.init;
   $('#main').innerHTML = `
     <div class="card">
@@ -300,13 +317,13 @@ function renderForm() {
       <div class="seg">${init.channels.map(c =>
         `<button type="button" data-ch="${esc(c)}" class="${f.channel === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
     </div>
-    <div id="items">${f.items.map(itemCard).join('')}</div>
-    <button class="add-btn" id="addItem">+ เพิ่มรายการ</button>
+    <div id="bills">${f.bills.map(billCard).join('')}</div>
+    <button class="add-btn" id="addBill">+ เพิ่มบิล</button>
     <div class="card">
       <label>หมายเหตุ (ถ้ามี)</label>
       <textarea id="fNote" placeholder="เช่น ชื่อลูกค้า / เลขที่ออเดอร์ออนไลน์">${esc(f.note)}</textarea>
     </div>`;
-  f.items.forEach((_, i) => updateItemInfo(i));
+  f.bills.forEach((b, bi) => b.items.forEach((_, ii) => updateItemInfo(bi, ii)));
   renderBar();
 
   $('#fDate').onchange = e => {
@@ -316,75 +333,118 @@ function renderForm() {
   };
   $('#main').querySelectorAll('[data-ch]').forEach(b => b.onclick = () => {
     f.channel = b.dataset.ch;
-    $('#main').querySelectorAll('.ref-label').forEach(x => x.innerHTML = refLabel(f.channel));
     $('#main').querySelectorAll('[data-ch]').forEach(x => x.classList.toggle('on', x === b));
+    $('#main').querySelectorAll('.ref-label').forEach(x => x.innerHTML = refLabel(f.channel));
     saveDraft();
   });
   $('#fNote').oninput = e => { f.note = e.target.value; saveDraft(); };
-  $('#addItem').onclick = () => {
-    const last = f.items[f.items.length - 1];
-    f.items.push(blankItem(last ? last.pay : '', last ? last.ref || '' : ''));
+  $('#addBill').onclick = () => {
+    const last = f.bills[f.bills.length - 1];
+    f.bills.push(blankBill(last ? last.pay : ''));
     saveDraft();
-    renderForm();
-    const cards = $('#items').querySelectorAll('.item');
-    const card = cards[cards.length - 1];
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(() => card.querySelector(last && last.ref ? '[data-f="code"]' : '[data-f="ref"]').focus(), 300);
+    renderForm({ bi: f.bills.length - 1, field: 'ref' });
   };
 
-  const items = $('#items');
-  items.addEventListener('input', e => {
-    const el = e.target, card = el.closest('.item');
-    if (!card || !el.dataset.f) return;
-    const i = Number(card.dataset.i);
-    f.items[i][el.dataset.f] = el.dataset.f === 'qty' ? Number(el.value) : el.value;
-    updateItemInfo(i);
+  const bills = $('#bills');
+  bills.addEventListener('input', e => {
+    const el = e.target, card = el.closest('.bill-card');
+    if (!card) return;
+    const bi = Number(card.dataset.b), b = f.bills[bi];
+    if (el.dataset.bf) {
+      b[el.dataset.bf] = el.value;
+    } else if (el.dataset.f) {
+      const ii = Number(el.closest('.prod').dataset.i);
+      b.items[ii][el.dataset.f] = el.dataset.f === 'qty' ? Number(el.value) : el.value;
+      updateItemInfo(bi, ii);
+    } else return;
     renderBar();
     saveDraft();
   });
-  items.addEventListener('change', e => {
+  bills.addEventListener('change', e => {
     const el = e.target;
-    if (el.dataset.f === 'code') {
-      const i = Number(el.closest('.item').dataset.i);
-      const p = state.products[normCode(el.value)];
-      if (p) { el.value = p.code; f.items[i].code = p.code; saveDraft(); }
-    }
+    if (el.dataset.f !== 'code') return;
+    const bi = Number(el.closest('.bill-card').dataset.b), ii = Number(el.closest('.prod').dataset.i);
+    const p = state.products[normCode(el.value)];
+    if (p) { el.value = p.code; f.bills[bi].items[ii].code = p.code; saveDraft(); }
   });
-  items.addEventListener('click', e => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    const card = b.closest('.item');
-    const i = Number(card.dataset.i);
-    const it = f.items[i];
-    if (b.dataset.step) {
-      const q = Math.max(1, (Number.isInteger(Number(it.qty)) ? Number(it.qty) : 1) + Number(b.dataset.step));
+  bills.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const card = btn.closest('.bill-card');
+    const bi = Number(card.dataset.b), b = f.bills[bi];
+    if (btn.dataset.removeBill !== undefined) {
+      f.bills.splice(bi, 1);
+      saveDraft();
+      return renderForm();
+    }
+    if (btn.dataset.addProd !== undefined) {
+      b.items.push(blankItem());
+      saveDraft();
+      return renderForm({ bi, ii: b.items.length - 1, field: 'code' });
+    }
+    const prod = btn.closest('.prod');
+    if (!prod) return;
+    const ii = Number(prod.dataset.i), it = b.items[ii];
+    if (btn.dataset.step) {
+      const q = Math.max(1, (Number.isInteger(Number(it.qty)) ? Number(it.qty) : 1) + Number(btn.dataset.step));
       it.qty = q;
-      card.querySelector('[data-f="qty"]').value = q;
-    } else if (b.dataset.unit) {
-      it.discType = b.dataset.unit;
-      card.querySelectorAll('[data-unit]').forEach(x => x.classList.toggle('on', x === b));
-    } else if (b.dataset.remove !== undefined) {
-      f.items.splice(i, 1);
+      prod.querySelector('[data-f="qty"]').value = q;
+    } else if (btn.dataset.unit) {
+      it.discType = btn.dataset.unit;
+      prod.querySelectorAll('[data-unit]').forEach(x => x.classList.toggle('on', x === btn));
+    } else if (btn.dataset.remove !== undefined) {
+      b.items.splice(ii, 1);
       saveDraft();
       return renderForm();
     } else return;
-    updateItemInfo(i);
+    updateItemInfo(bi, ii);
     renderBar();
     saveDraft();
   });
+
+  if (focus) {
+    const card = bills.querySelector(`.bill-card[data-b="${focus.bi}"]`);
+    const target = focus.ii !== undefined
+      ? card.querySelector(`.prod[data-i="${focus.ii}"] [data-f="${focus.field}"]`)
+      : card.querySelector(`[data-bf="${focus.field}"]`);
+    (focus.ii !== undefined ? target.closest('.prod') : card).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => target.focus(), 300);
+  }
 }
 
-function itemCard(it, i) {
-  const pays = state.init.payments;
-  return `<div class="card item" data-i="${i}">
+function billCard(b, bi) {
+  const f = state.form, pays = state.init.payments;
+  return `<div class="card bill-card" data-b="${bi}">
     <div class="item-head">
-      <span class="item-no">รายการที่ ${i + 1}</span>
-      ${state.form.items.length > 1 ? '<button type="button" class="link-btn" data-remove>ลบ</button>' : ''}
+      <span class="item-no">บิลที่ ${bi + 1}</span>
+      ${f.bills.length > 1 ? '<button type="button" class="link-btn" data-remove-bill>ลบบิลนี้</button>' : ''}
     </div>
-    <label class="ref-label">${refLabel(state.form.channel)}</label>
-    <input data-f="ref" value="${esc(it.ref || '')}" placeholder="เช่น SO2611001" autocomplete="off" autocapitalize="characters" spellcheck="false">
-    <label>รหัสสินค้า <span class="req">*</span></label>
-    <input data-f="code" list="productList" value="${esc(it.code)}" placeholder="พิมพ์รหัสหรือเลือกจากรายการ"
+    <div class="grid2">
+      <div>
+        <label class="ref-label">${refLabel(f.channel)}</label>
+        <input data-bf="ref" value="${esc(b.ref || '')}" placeholder="เช่น SO2611001" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      </div>
+      <div>
+        <label>วิธีชำระ <span class="req">*</span></label>
+        <select data-bf="pay">
+          <option value="" ${b.pay ? '' : 'selected'} disabled>เลือก</option>
+          ${pays.map(p => `<option ${p === b.pay ? 'selected' : ''}>${esc(p)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="prods">${b.items.map((it, ii) => prodRow(it, ii, b.items.length)).join('')}</div>
+    <button type="button" class="add-prod" data-add-prod>+ เพิ่มสินค้า</button>
+    <div class="bill-sum"><span>รวมบิลนี้</span><b data-bill-total>0 ฿</b></div>
+  </div>`;
+}
+
+function prodRow(it, ii, n) {
+  return `<div class="prod" data-i="${ii}">
+    <div class="prod-head">
+      <span>สินค้า ${ii + 1}</span>
+      ${n > 1 ? '<button type="button" class="link-btn" data-remove>ลบ</button>' : ''}
+    </div>
+    <input data-f="code" list="productList" value="${esc(it.code)}" placeholder="รหัสสินค้า (พิมพ์หรือเลือก)"
       autocomplete="off" autocapitalize="characters" spellcheck="false">
     <div class="pinfo" data-info></div>
     <div class="grid2">
@@ -397,55 +457,58 @@ function itemCard(it, i) {
         </div>
       </div>
       <div>
-        <label>วิธีชำระ <span class="req">*</span></label>
-        <select data-f="pay">
-          <option value="" ${it.pay ? '' : 'selected'} disabled>เลือก</option>
-          ${pays.map(p => `<option ${p === it.pay ? 'selected' : ''}>${esc(p)}</option>`).join('')}
-        </select>
-      </div>
-    </div>
-    <label>ส่วนลด</label>
-    <div class="disc">
-      <input data-f="disc" type="text" inputmode="decimal" value="${esc(it.disc)}" placeholder="0">
-      <div class="unit">
-        <button type="button" data-unit="baht" class="${it.discType !== 'pct' ? 'on' : ''}">บาท</button>
-        <button type="button" data-unit="pct" class="${it.discType === 'pct' ? 'on' : ''}">%</button>
+        <label>ส่วนลด</label>
+        <div class="disc">
+          <input data-f="disc" type="text" inputmode="decimal" value="${esc(it.disc)}" placeholder="0">
+          <div class="unit">
+            <button type="button" data-unit="baht" class="${it.discType !== 'pct' ? 'on' : ''}">฿</button>
+            <button type="button" data-unit="pct" class="${it.discType === 'pct' ? 'on' : ''}">%</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="line-total" data-total></div>
   </div>`;
 }
 
-function updateItemInfo(i) {
-  const card = $('#items').querySelector(`.item[data-i="${i}"]`);
+function updateItemInfo(bi, ii) {
+  const card = $('#bills').querySelector(`.bill-card[data-b="${bi}"]`);
   if (!card) return;
-  const c = calcItem(state.form.items[i]);
-  const info = card.querySelector('[data-info]');
-  const total = card.querySelector('[data-total]');
-  card.querySelector('[data-f="code"]').classList.toggle('bad', c.state === 'unknown');
-  if (c.state === 'empty') { info.className = 'pinfo'; info.textContent = ''; total.innerHTML = ''; return; }
-  if (c.state === 'unknown') {
+  const row = card.querySelector(`.prod[data-i="${ii}"]`);
+  const b = state.form.bills[bi];
+  const c = calcItem(b.items[ii]);
+  const info = row.querySelector('[data-info]');
+  const total = row.querySelector('[data-total]');
+  row.querySelector('[data-f="code"]').classList.toggle('bad', c.state === 'unknown');
+  if (c.state === 'empty') { info.className = 'pinfo'; info.textContent = ''; total.innerHTML = ''; }
+  else if (c.state === 'unknown') {
     info.className = 'pinfo err'; info.textContent = 'ไม่พบรหัสสินค้านี้';
-    total.innerHTML = ''; return;
+    total.innerHTML = '';
+  } else {
+    info.className = 'pinfo ok';
+    info.textContent = `${c.p.name} · ${money(c.p.price)} บาท/ชิ้น`;
+    total.innerHTML = c.error
+      ? `<span style="color:var(--danger)">${esc(c.error)}</span><span></span>`
+      : `<span>${money(c.gross)}${c.disc ? ' − ส่วนลด ' + money(c.disc) : ''}</span><b>${money(c.net)} ฿</b>`;
   }
-  info.className = 'pinfo ok';
-  info.textContent = `${c.p.name} · ${money(c.p.price)} บาท/ชิ้น`;
-  total.innerHTML = c.error
-    ? `<span style="color:var(--danger)">${esc(c.error)}</span><span></span>`
-    : `<span>${money(c.gross)}${c.disc ? ' − ส่วนลด ' + money(c.disc) : ''}</span><b>${money(c.net)} ฿</b>`;
+  card.querySelector('[data-bill-total]').textContent = money(billTotal(b)) + ' ฿';
 }
 
-function formTotal() {
-  return state.form.items.reduce((a, it) => {
+function billTotal(b) {
+  return b.items.reduce((a, it) => {
     const c = calcItem(it);
     return c.state === 'ok' && !c.error ? round2(a + c.net) : a;
   }, 0);
 }
 
+function formTotal() {
+  return state.form.bills.reduce((a, b) => round2(a + billTotal(b)), 0);
+}
+
 function renderBar() {
-  const n = state.form.items.length;
+  const bills = state.form.bills, n = bills.reduce((a, b) => a + b.items.length, 0);
   $('#bar').innerHTML = `<div class="bar-in">
-    <div class="bar-sum"><p class="meta">${n} รายการ · ยอดสุทธิ</p><b>${money(formTotal())} ฿</b></div>
+    <div class="bar-sum"><p class="meta">${bills.length} บิล · ${n} รายการ · ยอดสุทธิ</p><b>${money(formTotal())} ฿</b></div>
     <button class="btn primary" id="reviewBtn">ตรวจสอบและส่ง</button></div>`;
   $('#reviewBtn').onclick = review;
 }
@@ -463,13 +526,22 @@ function validate() {
   if (!f.date) return 'กรุณาเลือกวันที่ขาย';
   if (f.date > state.init.today) return 'วันที่ขายต้องไม่เกินวันนี้';
   if (!f.channel) return 'กรุณาเลือกช่องทาง หน้าร้าน หรือ ออนไลน์';
-  for (let i = 0; i < f.items.length; i++) {
-    const it = f.items[i], c = calcItem(it), n = i + 1;
-    if (f.channel === 'หน้าร้าน' && !String(it.ref || '').trim()) return `รายการที่ ${n}: กรุณากรอกเลขที่บิล/ใบเสร็จ`;
-    if (c.state === 'empty') return `รายการที่ ${n}: กรุณากรอกรหัสสินค้า`;
-    if (c.state === 'unknown') return `รายการที่ ${n}: ไม่พบรหัสสินค้า "${it.code}"`;
-    if (c.error) return `รายการที่ ${n}: ${c.error}`;
-    if (!it.pay) return `รายการที่ ${n}: กรุณาเลือกวิธีชำระ`;
+  const seen = {};
+  for (let bi = 0; bi < f.bills.length; bi++) {
+    const b = f.bills[bi], bn = bi + 1, ref = String(b.ref || '').trim();
+    if (f.channel === 'หน้าร้าน' && !ref) return `บิลที่ ${bn}: กรุณากรอกเลขที่บิล/ใบเสร็จ`;
+    if (ref) {
+      const k = normCode(ref.replace(/\s+/g, ''));
+      if (seen[k]) return `เลขที่บิล ${ref} ซ้ำกันในบิลที่ ${seen[k]} และ ${bn} ให้รวมสินค้าไว้ในบิลเดียว`;
+      seen[k] = bn;
+    }
+    if (!b.pay) return `บิลที่ ${bn}: กรุณาเลือกวิธีชำระ`;
+    for (let ii = 0; ii < b.items.length; ii++) {
+      const it = b.items[ii], c = calcItem(it), n = `บิลที่ ${bn} สินค้า ${ii + 1}`;
+      if (c.state === 'empty') return `${n}: กรุณากรอกรหัสสินค้า`;
+      if (c.state === 'unknown') return `${n}: ไม่พบรหัสสินค้า "${it.code}"`;
+      if (c.error) return `${n}: ${c.error}`;
+    }
   }
   return '';
 }
@@ -478,9 +550,9 @@ function review() {
   const err = validate();
   if (err) return toast(err, 3500);
   const f = state.form;
-  const lines = f.items.map(it => {
+  const lines = flatItems().map(it => {
     const c = calcItem(it);
-    return { ref: String(it.ref || '').trim(), code: c.p.code, qty: c.qty, discLabel: c.discLabel, pay: it.pay };
+    return { ref: it.ref, code: c.p.code, qty: c.qty, discLabel: c.discLabel, pay: it.pay };
   });
   const total = formTotal();
   openSheet(`
@@ -512,7 +584,7 @@ async function submit(confirmDup) {
   try {
     const res = await api('submit', {
       nonce: state.nonce, date: f.date, channel: f.channel, note: f.note.trim(), confirmDup: confirmDup === true,
-      items: f.items.map(it => ({ ref: String(it.ref || '').trim(), code: it.code.trim(), qty: Number(it.qty), discType: it.discType, disc: it.disc, pay: it.pay })),
+      items: flatItems().map(it => ({ ref: it.ref, code: it.code.trim(), qty: Number(it.qty), discType: it.discType, disc: it.disc, pay: it.pay })),
     });
     state.busy = false;
     if (res.needConfirm) return showDupConfirm(res.dups);
