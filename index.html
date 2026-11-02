@@ -579,7 +579,7 @@ function showDupConfirm(dups) {
   openSheet(`
     <h3>เลขที่บิลนี้เคยบันทึกแล้ว</h3>
     <div class="meta">ตรวจดูก่อนว่าไม่ได้คีย์ซ้ำ ถ้าตั้งใจเพิ่มรายการเข้าบิลเดิม กดยืนยันได้เลย</div>
-    <div class="summary">${esc(dups.map(d => d.ref + ': บันทึกแล้ววันที่ ' + thDateNum(d.date) + ' โดย ' + d.staff + ' (' + d.billId + ')').join('\n'))}</div>
+    <div class="summary">${esc(dups.map(d => d.ref + ': บันทึกแล้ววันที่ ' + thDateNum(d.date) + ' โดย ' + d.staff).join('\n'))}</div>
     <button class="btn primary full" id="confirmBtn">ยืนยัน บันทึกเพิ่มเข้าบิลเดิม</button>
     <button class="btn ghost full" style="margin-top:8px" id="backBtn">กลับไปแก้ไข</button>`);
   $('#backBtn').onclick = closeSheet;
@@ -608,7 +608,7 @@ async function submit(confirmDup) {
     openSheet(`
       <div class="check">✓</div>
       <h3 style="text-align:center">บันทึกยอดขายแล้ว</h3>
-      <div class="meta" style="text-align:center">เลขที่ในระบบ ${esc(b.billId)}</div>
+      <div class="meta" style="text-align:center">${new Set(b.items.map(i => i.ref || b.billId)).size} บิล · รวม ${money(b.total)} บาท</div>
       <div class="summary">${esc(text)}</div>
       <button class="btn ghost full" id="copyBtn">คัดลอกข้อความสรุป</button>
       <button class="btn primary full" style="margin-top:8px" id="nextBtn">บันทึกบิลถัดไป</button>`);
@@ -663,12 +663,12 @@ function renderHistory() {
         <span>${money(it.net)}</span></li>`).join('')}</ul>
       <div class="bill-total"><span>รวมสุทธิ</span><span>${money(b.total)} ฿</span></div>
       ${b.note ? `<div class="note">${esc(b.note)}</div>` : ''}
-      ${b.status !== 'ยกเลิก' ? `<button class="btn danger full" style="margin-top:12px;padding:10px" data-cancel="${esc(b.billId)}">ยกเลิกบิลนี้</button>` : ''}
+      ${b.status !== 'ยกเลิก' ? `<button class="btn danger full" style="margin-top:12px;padding:10px" data-cancel="${esc(b.key || b.billId)}" data-label="${esc(b.billId)}">ยกเลิกบิลนี้</button>` : ''}
     </div>`).join('')}`;
-  main.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => openCancel(b.dataset.cancel));
+  main.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => openCancel(b.dataset.cancel, b.dataset.label));
 }
 
-function openCancel(billId) {
+function openCancel(key, billId) {
   openSheet(`
     <h3>ยกเลิกบิล ${esc(billId)}</h3>
     <div class="meta">ยอดของบิลนี้จะไม่ถูกนับในสรุป (ข้อมูลยังอยู่ในชีต)</div>
@@ -683,7 +683,7 @@ function openCancel(billId) {
     const btn = $('#doCancel');
     state.busy = true; btn.disabled = true; btn.textContent = 'กำลังยกเลิก...';
     try {
-      await api('cancel', { billId, reason });
+      await api('cancel', { key, billId, reason });
       state.busy = false;
       closeSheet();
       toast('ยกเลิกบิลแล้ว');
