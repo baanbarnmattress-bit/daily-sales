@@ -96,6 +96,10 @@
   .add-prod{width:100%;margin-top:12px;border:1px dashed #cfd4da;background:var(--soft);border-radius:10px;padding:10px;font:inherit;font-weight:600;color:var(--primary-dark)}
   .bill-sum{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:2px solid var(--line);font-weight:600}
   .bill-sum b{font-size:17px}
+  .date-box{position:relative}
+  .date-show{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;font-size:17px;font-weight:500}
+  .date-hint{font-size:13px;font-weight:400;color:var(--muted)}
+  .date-box input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
 </style>
 </head>
 <body>
@@ -311,7 +315,10 @@ function renderForm(focus) {
   $('#main').innerHTML = `
     <div class="card">
       <label>วันที่ขาย <span class="req">*</span></label>
-      <input type="date" id="fDate" value="${esc(f.date)}" max="${esc(init.today)}">
+      <div class="date-box">
+        <div class="date-show"><span id="fDateShow">${esc(thDateNum(f.date) || 'เลือกวันที่')}</span><span class="date-hint">แตะเพื่อเปลี่ยน</span></div>
+        <input type="date" id="fDate" value="${esc(f.date)}" max="${esc(init.today)}" aria-label="วันที่ขาย">
+      </div>
       <div class="date-th" id="fDateTh">${esc(thDateLong(f.date))}</div>
       <label>ช่องทาง <span class="req">*</span></label>
       <div class="seg">${init.channels.map(c =>
@@ -329,8 +336,10 @@ function renderForm(focus) {
   $('#fDate').onchange = e => {
     f.date = e.target.value;
     $('#fDateTh').textContent = thDateLong(f.date);
+    $('#fDateShow').textContent = thDateNum(f.date) || 'เลือกวันที่';
     saveDraft();
   };
+  $('#fDate').onclick = e => { try { e.target.showPicker(); } catch (err) { /* บางเครื่องเปิดเองอยู่แล้ว */ } };
   $('#main').querySelectorAll('[data-ch]').forEach(b => b.onclick = () => {
     f.channel = b.dataset.ch;
     $('#main').querySelectorAll('[data-ch]').forEach(x => x.classList.toggle('on', x === b));
